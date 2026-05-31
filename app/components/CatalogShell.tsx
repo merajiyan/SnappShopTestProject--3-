@@ -197,6 +197,7 @@ export default function CatalogShell({
           <input
             value={searchText}
             onChange={(event) => onSearchChange(event.target.value)}
+            aria-label="Search products"
             placeholder="Search 5,000 products"
           />
           <button onClick={() => loadProducts("manual-search", 1, searchText)}>Search</button>
@@ -346,6 +347,8 @@ function FilterPanel(props: any) {
             <div
               key={brand}
               className={props.brand === brand ? "brand-choice selected" : "brand-choice"}
+              role="button"
+              tabIndex={0}
               onClick={() => props.setBrand(props.brand === brand ? "" : brand)}
             >
               {brand}
