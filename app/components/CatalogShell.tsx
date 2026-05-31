@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatCurrency, formatRating, getDiscountPercent } from "../lib/format";
 
@@ -46,14 +46,18 @@ export default function CatalogShell({
   const [lastServerTime, setLastServerTime] = useState("");
   const [lastRequestKey, setLastRequestKey] = useState("");
 
-  const priceBand = products.reduce(
-    (summary: any, product: any) => {
-      summary.low = Math.min(summary.low, product.price);
-      summary.high = Math.max(summary.high, product.price);
-      summary.average += product.price / Math.max(1, products.length);
-      return summary;
-    },
-    { low: Number.MAX_SAFE_INTEGER, high: 0, average: 0 }
+  const priceBand = useMemo(
+    () =>
+      products.reduce(
+        (summary: any, product: any) => {
+          summary.low = Math.min(summary.low, product.price);
+          summary.high = Math.max(summary.high, product.price);
+          summary.average += product.price / Math.max(1, products.length);
+          return summary;
+        },
+        { low: Number.MAX_SAFE_INTEGER, high: 0, average: 0 }
+      ),
+    [products]
   );
 
   const expensiveMerchandisingList = allProducts
