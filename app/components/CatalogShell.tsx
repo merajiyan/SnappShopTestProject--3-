@@ -122,11 +122,13 @@ export default function CatalogShell({
     if (query) params.set("q", query);
     if (selectedCategory || category) params.set("category", selectedCategory || category);
     if (brand) params.set("brand", brand);
+    if (minPrice) params.set("min", minPrice);
+    if (maxPrice) params.set("max", maxPrice);
     if (sort !== "popular") params.set("sort", sort);
     if (page > 1) params.set("page", String(page));
 
     router.replace(params.toString() ? `/?${params.toString()}` : "/", { scroll: false });
-  }, [query, selectedCategory, category, brand, sort, page, router]);
+  }, [query, selectedCategory, category, brand, minPrice, maxPrice, sort, page, router]);
 
   useEffect(() => {
     window.localStorage.setItem(
