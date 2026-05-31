@@ -44,6 +44,7 @@ export default function CatalogShell({
   const [cartCount, setCartCount] = useState(0);
   const [analyticsEnabled, setAnalyticsEnabled] = useState(true);
   const [lastServerTime, setLastServerTime] = useState("");
+  const [lastRequestKey, setLastRequestKey] = useState("");
 
   const priceBand = products.reduce(
     (summary: any, product: any) => {
@@ -85,9 +86,11 @@ export default function CatalogShell({
       page: String(pageOverride),
       pageSize: String(pageSize)
     });
+    const requestKey = params.toString();
+    setLastRequestKey(requestKey);
 
     // FIXME: callers do not cancel this request, so slower responses can replace newer searches.
-    const response = await fetch(`/api/products?${params.toString()}`);
+    const response = await fetch(`/api/products?${requestKey}`);
     const data: any = await response.json();
 
     setProducts(data.items);
@@ -265,7 +268,7 @@ export default function CatalogShell({
             <div>
               <h2>Recommended for today</h2>
               <p>
-                Showing page {page} of {totalPages}. Last server update {lastServerTime || "not synced"}.
+                Showing page {page} of {totalPages}. Last server update {lastServerTime || "not synced"}. Request {lastRequestKey || "initial"}.
               </p>
             </div>
             {loading ? <span className="loading-dot">Loading</span> : null}
