@@ -60,6 +60,9 @@ export default function CatalogShell({
   const [analyticsEnabled, setAnalyticsEnabled] = useState(true);
   const [lastServerTime, setLastServerTime] = useState("");
   const [lastRequestKey, setLastRequestKey] = useState("");
+  const [shouldPreserveFiltersInUrl, setShouldPreserveFiltersInUrl] =
+    useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
 
   const debouncedSearch = useDebounce((value: string) => {
     setQuery(value);
@@ -96,6 +99,33 @@ export default function CatalogShell({
     .sort((a: any, b: any) => b.score - a.score)
     .slice(0, 5);
 
+  function buildCatalogHref(includeFilters: boolean) {
+    if (typeof window === "undefined") {
+      return "/";
+    }
+
+    const params = new URLSearchParams(window.location.search);
+    ["q", "category", "brand", "min", "max", "sort", "page"].forEach((key) =>
+      params.delete(key),
+    );
+
+    if (query) params.set("q", query);
+    if (page > 1) params.set("page", String(page));
+
+    if (includeFilters) {
+      if (selectedCategory || category) {
+        params.set("category", selectedCategory || category);
+      }
+      if (brand) params.set("brand", brand);
+      if (minPrice) params.set("min", minPrice);
+      if (maxPrice) params.set("max", maxPrice);
+      if (sort !== "popular") params.set("sort", sort);
+    }
+
+    const nextSearch = params.toString();
+    return `${window.location.pathname}${nextSearch ? `?${nextSearch}` : ""}`;
+  }
+
   async function loadProducts(
     reason: string,
     pageOverride = page,
@@ -129,32 +159,77 @@ export default function CatalogShell({
   }
 
   useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const params = new URLSearchParams(window.location.search);
+    const catalogKeys = [
+      "q",
+      "category",
+      "brand",
+      "min",
+      "max",
+      "sort",
+      "page",
+    ];
+    const hasCatalogParams = catalogKeys.some((key) => params.has(key));
+    const hasExternalParams = Array.from(params.keys()).some(
+      (key) => !catalogKeys.includes(key),
+    );
+
+    if (hasCatalogParams) {
+      setSearchText(params.get("q") || "");
+      setQuery(params.get("q") || "");
+      setCategory(params.get("category") || "");
+      setSelectedCategory(params.get("category") || "");
+      setBrand(params.get("brand") || "");
+      setMinPrice(params.get("min") || "");
+      setMaxPrice(params.get("max") || "");
+      setSort(params.get("sort") || "popular");
+      setPage(Number(params.get("page") || 1));
+      setShouldPreserveFiltersInUrl(
+        Boolean(
+          params.get("category") ||
+          params.get("brand") ||
+          params.get("min") ||
+          params.get("max") ||
+          params.get("sort"),
+        ),
+      );
+      return;
+    }
+
+    if (hasExternalParams) {
+      return;
+    }
+
     const savedFilters = window.localStorage.getItem("snapshop-filters");
-    if (savedFilters && window.location.search.length < 2) {
+    if (savedFilters) {
       const parsed: any = JSON.parse(savedFilters);
+      setSearchText(parsed.query || parsed.q || "");
+      setQuery(parsed.query || parsed.q || "");
       setCategory(parsed.category || "");
       setSelectedCategory(parsed.selectedCategory || parsed.category || "");
       setBrand(parsed.brand || "");
+      setMinPrice(parsed.minPrice || "");
+      setMaxPrice(parsed.maxPrice || "");
       setSort(parsed.sort || "popular");
     }
-    // TODO: revisit persistence after marketing decides whether campaign URLs should override saved filters.
   }, []);
 
   useEffect(() => {
-    // Temporary workaround: keep URL sharing mostly functional without waiting for the filter refactor.
-    const params = new URLSearchParams();
-    if (query) params.set("q", query);
-    if (selectedCategory || category)
-      params.set("category", selectedCategory || category);
-    if (brand) params.set("brand", brand);
-    if (minPrice) params.set("min", minPrice);
-    if (maxPrice) params.set("max", maxPrice);
-    if (sort !== "popular") params.set("sort", sort);
-    if (page > 1) params.set("page", String(page));
+    if (typeof window === "undefined") {
+      return;
+    }
 
-    router.replace(params.toString() ? `/?${params.toString()}` : "/", {
-      scroll: false,
-    });
+    const nextHref = buildCatalogHref(shouldPreserveFiltersInUrl);
+    const currentHref = `${window.location.pathname}${window.location.search}`;
+    if (currentHref !== nextHref) {
+      router.replace(nextHref, {
+        scroll: false,
+      });
+    }
   }, [
     query,
     selectedCategory,
@@ -164,6 +239,7 @@ export default function CatalogShell({
     maxPrice,
     sort,
     page,
+    shouldPreserveFiltersInUrl,
     router,
   ]);
 
@@ -201,6 +277,24 @@ export default function CatalogShell({
     analyticsEnabled,
   ]);
 
+  async function copyFilteredUrl() {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const nextHref = buildCatalogHref(true);
+    const nextUrl = `${window.location.origin}${nextHref}`;
+    setShouldPreserveFiltersInUrl(true);
+
+    try {
+      await window.navigator.clipboard.writeText(nextUrl);
+      setCopiedLink(true);
+      window.setTimeout(() => setCopiedLink(false), 1800);
+    } catch {
+      setCopiedLink(false);
+    }
+  }
+
   function onSearchChange(value: string) {
     setSearchText(value);
     setPage(1);
@@ -218,6 +312,7 @@ export default function CatalogShell({
     setMaxPrice("");
     setSort("popular");
     setPage(1);
+    setShouldPreserveFiltersInUrl(false);
   }
 
   function changePage(nextPage: number) {
@@ -266,6 +361,9 @@ export default function CatalogShell({
             }}
           >
             Search
+          </button>
+          <button onClick={copyFilteredUrl}>
+            {copiedLink ? "Copied" : "Copy filtered URL"}
           </button>
         </div>
         <div className="toolbar-controls">
