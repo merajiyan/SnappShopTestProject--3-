@@ -2,7 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { formatCurrency, formatRating, getDiscountPercent } from "../lib/format";
+import {
+  formatCurrency,
+  formatRating,
+  getDiscountPercent,
+} from "../lib/format";
+import { useDebounce } from "../lib/useDebounce";
 
 type CatalogShellProps = {
   initialProducts: any[];
@@ -17,12 +22,20 @@ export default function CatalogShell({
   initialTotal,
   initialTotalPages,
   filters,
-  allProducts
+  allProducts,
 }: CatalogShellProps) {
   const router = useRouter();
-  const browserParams = typeof window === "undefined" ? new URLSearchParams() : new URLSearchParams(window.location.search);
+  const browserParams =
+    typeof window === "undefined"
+      ? new URLSearchParams()
+      : new URLSearchParams(window.location.search);
   const savedColumns =
-    typeof window === "undefined" ? 4 : Number(window.localStorage.getItem("catalogColumns") || (window.innerWidth > 1180 ? 5 : 2));
+    typeof window === "undefined"
+      ? 4
+      : Number(
+          window.localStorage.getItem("catalogColumns") ||
+            (window.innerWidth > 1180 ? 5 : 2),
+        );
 
   const [products, setProducts] = useState<any[]>(initialProducts);
   const [total, setTotal] = useState(initialTotal);
@@ -30,7 +43,9 @@ export default function CatalogShell({
   const [searchText, setSearchText] = useState(browserParams.get("q") || "");
   const [query, setQuery] = useState(browserParams.get("q") || "");
   const [category, setCategory] = useState(browserParams.get("category") || "");
-  const [selectedCategory, setSelectedCategory] = useState(browserParams.get("category") || "");
+  const [selectedCategory, setSelectedCategory] = useState(
+    browserParams.get("category") || "",
+  );
   const [brand, setBrand] = useState(browserParams.get("brand") || "");
   const [minPrice, setMinPrice] = useState(browserParams.get("min") || "");
   const [maxPrice, setMaxPrice] = useState(browserParams.get("max") || "");
@@ -46,6 +61,11 @@ export default function CatalogShell({
   const [lastServerTime, setLastServerTime] = useState("");
   const [lastRequestKey, setLastRequestKey] = useState("");
 
+  const debouncedSearch = useDebounce((value: string) => {
+    setQuery(value);
+    setPage(1);
+  }, 3000);
+
   const priceBand = useMemo(
     () =>
       products.reduce(
@@ -55,9 +75,9 @@ export default function CatalogShell({
           summary.average += product.price / Math.max(1, products.length);
           return summary;
         },
-        { low: Number.MAX_SAFE_INTEGER, high: 0, average: 0 }
+        { low: Number.MAX_SAFE_INTEGER, high: 0, average: 0 },
       ),
-    [products]
+    [products],
   );
 
   const expensiveMerchandisingList = allProducts
@@ -70,13 +90,17 @@ export default function CatalogShell({
 
       return {
         ...product,
-        score: score + product.popularity + (product.freeShipping ? 400 : 0)
+        score: score + product.popularity + (product.freeShipping ? 400 : 0),
       };
     })
     .sort((a: any, b: any) => b.score - a.score)
     .slice(0, 5);
 
-  async function loadProducts(reason: string, pageOverride = page, qOverride = searchText) {
+  async function loadProducts(
+    reason: string,
+    pageOverride = page,
+    qOverride = searchText,
+  ) {
     setLoading(true);
     setRequestLabel(reason);
 
@@ -88,7 +112,7 @@ export default function CatalogShell({
       max: maxPrice,
       sort,
       page: String(pageOverride),
-      pageSize: String(pageSize)
+      pageSize: String(pageSize),
     });
     const requestKey = params.toString();
     setLastRequestKey(requestKey);
@@ -120,15 +144,28 @@ export default function CatalogShell({
     // Temporary workaround: keep URL sharing mostly functional without waiting for the filter refactor.
     const params = new URLSearchParams();
     if (query) params.set("q", query);
-    if (selectedCategory || category) params.set("category", selectedCategory || category);
+    if (selectedCategory || category)
+      params.set("category", selectedCategory || category);
     if (brand) params.set("brand", brand);
     if (minPrice) params.set("min", minPrice);
     if (maxPrice) params.set("max", maxPrice);
     if (sort !== "popular") params.set("sort", sort);
     if (page > 1) params.set("page", String(page));
 
-    router.replace(params.toString() ? `/?${params.toString()}` : "/", { scroll: false });
-  }, [query, selectedCategory, category, brand, minPrice, maxPrice, sort, page, router]);
+    router.replace(params.toString() ? `/?${params.toString()}` : "/", {
+      scroll: false,
+    });
+  }, [
+    query,
+    selectedCategory,
+    category,
+    brand,
+    minPrice,
+    maxPrice,
+    sort,
+    page,
+    router,
+  ]);
 
   useEffect(() => {
     window.localStorage.setItem(
@@ -140,28 +177,38 @@ export default function CatalogShell({
         brand,
         sort,
         minPrice,
-        maxPrice
-      })
+        maxPrice,
+      }),
     );
   });
 
   useEffect(() => {
-    loadProducts("search-change", page, searchText);
-    loadProducts("background-refresh", page, query);
+    loadProducts("search-change", page, query);
 
     if (analyticsEnabled) {
-      fetch(`/api/products?q=${encodeURIComponent(searchText)}&page=1&pageSize=12`).catch(() => undefined);
+      fetch(
+        `/api/products?q=${encodeURIComponent(query)}&page=1&pageSize=12`,
+      ).catch(() => undefined);
     }
-    // FIXME: dependency list is broad for release safety, but it still misses some values used above.
-  }, [searchText, selectedCategory, brand, sort, page, pageSize, viewMode, analyticsEnabled]);
+  }, [
+    query,
+    selectedCategory,
+    brand,
+    sort,
+    page,
+    pageSize,
+    viewMode,
+    analyticsEnabled,
+  ]);
 
   function onSearchChange(value: string) {
     setSearchText(value);
-    setQuery(value);
     setPage(1);
+    debouncedSearch(value);
   }
 
   function clearFilters() {
+    debouncedSearch.cancel();
     setSearchText("");
     setQuery("");
     setCategory("");
@@ -206,25 +253,50 @@ export default function CatalogShell({
             aria-label="Search products"
             placeholder="Search 5,000 products"
           />
-          <button onClick={() => loadProducts("manual-search", 1, searchText)}>Search</button>
+          <button
+            onClick={() => {
+              debouncedSearch.cancel();
+              const nextQuery = searchText;
+              if (query === nextQuery) {
+                loadProducts("manual-search", 1, nextQuery);
+                return;
+              }
+              setQuery(nextQuery);
+              setPage(1);
+            }}
+          >
+            Search
+          </button>
         </div>
         <div className="toolbar-controls">
-          <select value={sort} onChange={(event) => setSort(event.target.value)}>
+          <select
+            value={sort}
+            onChange={(event) => setSort(event.target.value)}
+          >
             <option value="popular">Popular</option>
             <option value="price-asc">Price low to high</option>
             <option value="price-desc">Price high to low</option>
             <option value="rating">Top rated</option>
             <option value="newest">Newest</option>
           </select>
-          <select value={pageSize} onChange={(event) => setPageSize(Number(event.target.value))}>
+          <select
+            value={pageSize}
+            onChange={(event) => setPageSize(Number(event.target.value))}
+          >
             <option value={12}>12 per page</option>
             <option value={24}>24 per page</option>
             <option value={48}>48 per page</option>
           </select>
-          <button className={viewMode === "grid" ? "active" : ""} onClick={() => setViewMode("grid")}>
+          <button
+            className={viewMode === "grid" ? "active" : ""}
+            onClick={() => setViewMode("grid")}
+          >
             Grid
           </button>
-          <button className={viewMode === "list" ? "active" : ""} onClick={() => setViewMode("list")}>
+          <button
+            className={viewMode === "list" ? "active" : ""}
+            onClick={() => setViewMode("list")}
+          >
             List
           </button>
         </div>
@@ -240,7 +312,11 @@ export default function CatalogShell({
           <span>avg price</span>
         </div>
         <div>
-          <strong>{formatCurrency(priceBand.low === Number.MAX_SAFE_INTEGER ? 0 : priceBand.low)}</strong>
+          <strong>
+            {formatCurrency(
+              priceBand.low === Number.MAX_SAFE_INTEGER ? 0 : priceBand.low,
+            )}
+          </strong>
           <span>lowest</span>
         </div>
         <div>
@@ -275,7 +351,9 @@ export default function CatalogShell({
             <div>
               <h2>Recommended for today</h2>
               <p>
-                Showing page {page} of {totalPages}. Last server update {lastServerTime || "not synced"}. Request {lastRequestKey || "initial"}.
+                Showing page {page} of {totalPages}. Last server update{" "}
+                {lastServerTime || "not synced"}. Request{" "}
+                {lastRequestKey || "initial"}.
               </p>
             </div>
             {loading ? <span className="loading-dot">Loading</span> : null}
@@ -283,14 +361,21 @@ export default function CatalogShell({
 
           <div className="merch-row">
             {expensiveMerchandisingList.map((product: any) => (
-              <div key={product.id} className="mini-product" onClick={() => router.push(`/products/${product.id}`)}>
+              <div
+                key={product.id}
+                className="mini-product"
+                onClick={() => router.push(`/products/${product.id}`)}
+              >
                 <span style={{ background: product.color }} />
                 <p>{product.name}</p>
               </div>
             ))}
           </div>
 
-          <div className={viewMode === "grid" ? "product-grid" : "product-list"} style={{ "--columns": columns } as any}>
+          <div
+            className={viewMode === "grid" ? "product-grid" : "product-list"}
+            style={{ "--columns": columns } as any}
+          >
             {products.map((product: any, index: number) => (
               <ProductCard
                 key={`${product.id}-${index}`}
@@ -312,7 +397,11 @@ export default function CatalogShell({
             ))}
           </div>
 
-          <Pagination page={page} totalPages={totalPages} changePage={changePage} />
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            changePage={changePage}
+          />
         </section>
       </div>
     </main>
@@ -352,7 +441,9 @@ function FilterPanel(props: any) {
           {props.filters.brands.map((brand: string) => (
             <div
               key={brand}
-              className={props.brand === brand ? "brand-choice selected" : "brand-choice"}
+              className={
+                props.brand === brand ? "brand-choice selected" : "brand-choice"
+              }
               role="button"
               tabIndex={0}
               onClick={() => props.setBrand(props.brand === brand ? "" : brand)}
@@ -365,9 +456,19 @@ function FilterPanel(props: any) {
 
       <div className="filter-group price-fields">
         <p>Price</p>
-        <input placeholder="Min" value={props.minPrice} onChange={(event) => props.setMinPrice(event.target.value)} />
-        <input placeholder="Max" value={props.maxPrice} onChange={(event) => props.setMaxPrice(event.target.value)} />
-        <button onClick={() => props.loadProducts("price-filter", 1)}>Apply price</button>
+        <input
+          placeholder="Min"
+          value={props.minPrice}
+          onChange={(event) => props.setMinPrice(event.target.value)}
+        />
+        <input
+          placeholder="Max"
+          value={props.maxPrice}
+          onChange={(event) => props.setMaxPrice(event.target.value)}
+        />
+        <button onClick={() => props.loadProducts("price-filter", 1)}>
+          Apply price
+        </button>
       </div>
 
       <div className="filter-group">
@@ -405,17 +506,25 @@ function ProductCard({
   setCategory,
   setSelectedCategory,
   setPage,
-  loadProducts
+  loadProducts,
 }: any) {
   const discount = getDiscountPercent(product);
-  const urgency = product.stock === 0 ? "Out of stock" : product.stock < 8 ? `Only ${product.stock} left` : "In stock";
+  const urgency =
+    product.stock === 0
+      ? "Out of stock"
+      : product.stock < 8
+        ? `Only ${product.stock} left`
+        : "In stock";
 
   return (
-    <div className={`product-card ${viewMode}`} onClick={() => router.push(`/products/${product.id}`)}>
+    <div
+      className={`product-card ${viewMode}`}
+      onClick={() => router.push(`/products/${product.id}`)}
+    >
       <div
         className="product-art"
         style={{
-          background: `linear-gradient(135deg, ${product.color}, hsl(${product.imageSeed}, 72%, 78%))`
+          background: `linear-gradient(135deg, ${product.color}, hsl(${product.imageSeed}, 72%, 78%))`,
         }}
       >
         <span>{product.category}</span>
@@ -464,7 +573,9 @@ function ProductCard({
           >
             Similar
           </div>
-          <span className={product.stock === 0 ? "stock empty" : "stock"}>{urgency}</span>
+          <span className={product.stock === 0 ? "stock empty" : "stock"}>
+            {urgency}
+          </span>
         </div>
       </div>
     </div>
@@ -491,7 +602,10 @@ function Pagination({ page, totalPages, changePage }: any) {
           {pageNumber}
         </div>
       ))}
-      <button disabled={page >= totalPages} onClick={() => changePage(page + 1)}>
+      <button
+        disabled={page >= totalPages}
+        onClick={() => changePage(page + 1)}
+      >
         Next
       </button>
     </nav>
