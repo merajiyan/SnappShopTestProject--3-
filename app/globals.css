@@ -47,6 +47,28 @@ input {
   border: 1px solid var(--line);
 }
 
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+[role="button"]:focus-visible,
+[tabindex="0"]:focus-visible {
+  outline: 3px solid #f59e0b;
+  outline-offset: 2px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 button {
   min-height: 40px;
   padding: 0 14px;
@@ -279,7 +301,9 @@ h3 {
   margin-top: 18px;
 }
 
-.filter-group p {
+.filter-group p,
+.filter-group label,
+.filter-group legend {
   margin: 0 0 8px;
   color: var(--ink);
   font-weight: 800;
@@ -307,9 +331,11 @@ h3 {
   border-radius: var(--radius);
   background: #fbfcfe;
   cursor: pointer;
+  text-align: left;
 }
 
 .brand-choice {
+  width: 100%;
   min-height: 36px;
   padding: 9px 10px;
   color: var(--muted);
@@ -375,6 +401,7 @@ h3 {
   min-height: 58px;
   align-items: center;
   padding: 8px;
+  font: inherit;
 }
 
 .mini-product span,

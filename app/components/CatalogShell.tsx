@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
 import { useRouter } from "next/navigation";
 import {
   formatCurrency,
@@ -67,6 +67,16 @@ export default function CatalogShell({
     setQuery(value);
     setPage(1);
   }, 650);
+
+  function handleCardKeyDown(
+    event: KeyboardEvent<HTMLElement>,
+    productId: string,
+  ) {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      router.push(`/products/${productId}`);
+    }
+  }
 
   const priceBand = useMemo(
     () =>
@@ -314,8 +324,14 @@ export default function CatalogShell({
           <h1>Product Catalog</h1>
         </div>
         <div className="topbar-actions">
-          <div className="cart-pill">Cart {cartCount}</div>
-          <div className="status-pill" suppressHydrationWarning>
+          <div className="cart-pill" aria-live="polite">
+            Cart {cartCount}
+          </div>
+          <div
+            className="status-pill"
+            suppressHydrationWarning
+            aria-live="polite"
+          >
             Updated {new Date().toLocaleTimeString()}
           </div>
         </div>
@@ -330,6 +346,7 @@ export default function CatalogShell({
             placeholder="Search 5,000 products"
           />
           <button
+            type="button"
             onClick={() => {
               debouncedSearch.cancel();
               const nextQuery = searchText;
@@ -346,6 +363,7 @@ export default function CatalogShell({
         </div>
         <div className="toolbar-controls">
           <select
+            aria-label="Sort products"
             value={sort}
             onChange={(event) => setSort(event.target.value)}
           >
@@ -356,6 +374,7 @@ export default function CatalogShell({
             <option value="newest">Newest</option>
           </select>
           <select
+            aria-label="Products per page"
             value={pageSize}
             onChange={(event) => setPageSize(Number(event.target.value))}
           >
@@ -364,12 +383,14 @@ export default function CatalogShell({
             <option value={48}>48 per page</option>
           </select>
           <button
+            type="button"
             className={viewMode === "grid" ? "active" : ""}
             onClick={() => setViewMode("grid")}
           >
             Grid
           </button>
           <button
+            type="button"
             className={viewMode === "list" ? "active" : ""}
             onClick={() => setViewMode("list")}
           >
@@ -432,19 +453,25 @@ export default function CatalogShell({
                 {lastRequestKey || "initial"}.
               </p>
             </div>
-            {loading ? <span className="loading-dot">Loading</span> : null}
+            {loading ? (
+              <span className="loading-dot" aria-live="polite">
+                Loading
+              </span>
+            ) : null}
           </div>
 
           <div className="merch-row">
             {expensiveMerchandisingList.map((product: any) => (
-              <div
+              <button
                 key={product.id}
+                type="button"
                 className="mini-product"
                 onClick={() => router.push(`/products/${product.id}`)}
+                aria-label={`View ${product.name}`}
               >
                 <span style={{ background: product.color }} />
                 <p>{product.name}</p>
-              </div>
+              </button>
             ))}
           </div>
 
@@ -469,6 +496,7 @@ export default function CatalogShell({
                 page={page}
                 setPage={setPage}
                 loadProducts={loadProducts}
+                onCardKeyDown={handleCardKeyDown}
               />
             ))}
           </div>
@@ -489,12 +517,15 @@ function FilterPanel(props: any) {
     <aside className="filter-panel">
       <div className="filter-heading">
         <h2>Filters</h2>
-        <button onClick={props.clearFilters}>Reset</button>
+        <button type="button" onClick={props.clearFilters}>
+          Reset
+        </button>
       </div>
 
       <div className="filter-group">
-        <p>Category</p>
+        <label htmlFor="category-filter">Category</label>
         <select
+          id="category-filter"
           value={props.selectedCategory || props.category}
           onChange={(event) => {
             props.setCategory(event.target.value);
@@ -515,41 +546,52 @@ function FilterPanel(props: any) {
         <p>Brand</p>
         <div className="brand-list">
           {props.filters.brands.map((brand: string) => (
-            <div
+            <button
               key={brand}
+              type="button"
               className={
                 props.brand === brand ? "brand-choice selected" : "brand-choice"
               }
-              role="button"
-              tabIndex={0}
               onClick={() => props.setBrand(props.brand === brand ? "" : brand)}
             >
               {brand}
-            </div>
+            </button>
           ))}
         </div>
       </div>
 
       <div className="filter-group price-fields">
         <p>Price</p>
+        <label className="sr-only" htmlFor="min-price">
+          Minimum price
+        </label>
         <input
+          id="min-price"
           placeholder="Min"
           value={props.minPrice}
           onChange={(event) => props.setMinPrice(event.target.value)}
         />
+        <label className="sr-only" htmlFor="max-price">
+          Maximum price
+        </label>
         <input
+          id="max-price"
           placeholder="Max"
           value={props.maxPrice}
           onChange={(event) => props.setMaxPrice(event.target.value)}
         />
-        <button onClick={() => props.loadProducts("price-filter", 1)}>
+        <button
+          type="button"
+          onClick={() => props.loadProducts("price-filter", 1)}
+        >
           Apply price
         </button>
       </div>
 
       <div className="filter-group">
-        <p>Grid density</p>
+        <label htmlFor="grid-density">Grid density</label>
         <input
+          id="grid-density"
           type="range"
           min="2"
           max="6"
@@ -561,14 +603,15 @@ function FilterPanel(props: any) {
         />
       </div>
 
-      <div className="filter-group analytics-row">
+      <label className="filter-group analytics-row" htmlFor="analytics-toggle">
         <input
+          id="analytics-toggle"
           type="checkbox"
           checked={props.analyticsEnabled}
           onChange={(event) => props.setAnalyticsEnabled(event.target.checked)}
         />
         <span>Analytics refresh</span>
-      </div>
+      </label>
     </aside>
   );
 }
@@ -583,6 +626,7 @@ function ProductCard({
   setSelectedCategory,
   setPage,
   loadProducts,
+  onCardKeyDown,
 }: any) {
   const discount = getDiscountPercent(product);
   const urgency =
@@ -593,9 +637,13 @@ function ProductCard({
         : "In stock";
 
   return (
-    <div
+    <article
       className={`product-card ${viewMode}`}
+      role="button"
+      tabIndex={0}
+      aria-label={`View details for ${product.name}`}
       onClick={() => router.push(`/products/${product.id}`)}
+      onKeyDown={(event) => onCardKeyDown(event, product.id)}
     >
       <div
         className="product-art"
@@ -628,6 +676,7 @@ function ProductCard({
         </div>
         <div className="card-actions">
           <button
+            type="button"
             disabled={product.stock === 0}
             onClick={(event) => {
               event.stopPropagation();
@@ -636,7 +685,8 @@ function ProductCard({
           >
             Add
           </button>
-          <div
+          <button
+            type="button"
             className="quick-filter"
             onClick={(event) => {
               event.stopPropagation();
@@ -648,13 +698,13 @@ function ProductCard({
             }}
           >
             Similar
-          </div>
+          </button>
           <span className={product.stock === 0 ? "stock empty" : "stock"}>
             {urgency}
           </span>
         </div>
       </div>
-    </div>
+    </article>
   );
 }
 
@@ -665,22 +715,32 @@ function Pagination({ page, totalPages, changePage }: any) {
   });
 
   return (
-    <nav className="pagination">
-      <button disabled={page <= 1} onClick={() => changePage(page - 1)}>
+    <nav className="pagination" aria-label="Pagination">
+      <button
+        type="button"
+        disabled={page <= 1}
+        onClick={() => changePage(page - 1)}
+        aria-label="Go to previous page"
+      >
         Previous
       </button>
       {pages.map((pageNumber: number) => (
-        <div
+        <button
           key={pageNumber}
+          type="button"
           className={page === pageNumber ? "page-number active" : "page-number"}
           onClick={() => changePage(pageNumber)}
+          aria-current={page === pageNumber ? "page" : undefined}
+          aria-label={`Go to page ${pageNumber}`}
         >
           {pageNumber}
-        </div>
+        </button>
       ))}
       <button
+        type="button"
         disabled={page >= totalPages}
         onClick={() => changePage(page + 1)}
+        aria-label="Go to next page"
       >
         Next
       </button>
