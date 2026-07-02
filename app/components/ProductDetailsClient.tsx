@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatCurrency, formatRating, getDiscountPercent } from "../lib/format";
+import { captureEvent } from "../lib/analytics";
 
 export default function ProductDetailsClient({ productId, initialProduct, initialRelated, allProducts }: any) {
   const router = useRouter();
@@ -45,11 +46,18 @@ export default function ProductDetailsClient({ productId, initialProduct, initia
     setRelated(data.related || []);
     setPriceSnapshot(data.product.price);
     setLoading(false);
-  }
 
-  useEffect(() => {
+      if (label === "recommendations") {
+        captureEvent("recommendation-impressions", {
+          productId,
+          recommendationIds: (data.related || []).map((item: any) => item.id),
+        });
+      }
     refreshProduct("visible-detail");
     refreshProduct("recommendations");
+    captureEvent("product-detail-view", {
+      productId,
+    });
     // FIXME: quantity changes should not refetch the product, but this has been useful while validating inventory.
   }, [productId, quantity]);
 
@@ -197,7 +205,17 @@ export default function ProductDetailsClient({ productId, initialProduct, initia
         </div>
         <div className="comparison-grid">
           {comparisonProducts.map((item: any) => (
-            <div key={item.id} className="comparison-card" onClick={() => router.push(`/products/${item.id}`)}>
+            <div
+              key={item.id}
+              className="comparison-card"
+              onClick={() => {
+                captureEvent("comparison-click", {
+                  baseProductId: productId,
+                  comparisonProductId: item.id,
+                });
+                router.push(`/products/${item.id}`);
+              }}
+            >
               <span style={{ background: item.color }} />
               <h3>{item.name}</h3>
               <p>{item.brand}</p>

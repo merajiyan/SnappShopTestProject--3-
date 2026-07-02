@@ -8,6 +8,7 @@ import {
   getDiscountPercent,
 } from "../lib/format";
 import { useDebounce } from "../lib/useDebounce";
+import { captureEvent } from "../lib/analytics";
 
 type CatalogShellProps = {
   initialProducts: any[];
@@ -67,6 +68,27 @@ export default function CatalogShell({
     setQuery(value);
     setPage(1);
   }, 650);
+
+  function captureCatalogEvent(
+    event: string,
+    payload: Record<string, any> = {},
+  ) {
+    if (!analyticsEnabled) {
+      return;
+    }
+
+    captureEvent(event, {
+      ...payload,
+      query,
+      category: selectedCategory || category,
+      brand,
+      minPrice,
+      maxPrice,
+      sort,
+      page,
+      pageSize,
+    });
+  }
 
   function handleCardKeyDown(
     event: KeyboardEvent<HTMLElement>,
@@ -165,6 +187,14 @@ export default function CatalogShell({
     setTotalPages(data.totalPages);
     setLastServerTime(data.serverTime);
     setLoading(false);
+
+    captureCatalogEvent("catalog-fetch", {
+      reason,
+      requestKey,
+      resultCount: data.total,
+      query: qOverride,
+      page: pageOverride,
+    });
   }
 
   useEffect(() => {
@@ -286,13 +316,36 @@ export default function CatalogShell({
     analyticsEnabled,
   ]);
 
+  useEffect(() => {
+    if (!analyticsEnabled) {
+      return;
+    }
+
+    captureCatalogEvent("catalog-impressions", {
+      productIds: products.map((item) => item.id),
+      resultCount: products.length,
+    });
+  }, [products, analyticsEnabled]);
+
   function onSearchChange(value: string) {
     setSearchText(value);
     setPage(1);
+    if (analyticsEnabled) {
+      captureCatalogEvent("search-term", { query: value });
+    }
     debouncedSearch(value);
   }
 
   function clearFilters() {
+    if (analyticsEnabled) {
+      captureCatalogEvent("clear-filters", {
+        previousQuery: searchText,
+        previousCategory: category,
+        previousBrand: brand,
+        previousSort: sort,
+      });
+    }
+
     debouncedSearch.cancel();
     setSearchText("");
     setQuery("");
@@ -307,6 +360,10 @@ export default function CatalogShell({
   }
 
   function changePage(nextPage: number) {
+    if (analyticsEnabled) {
+      captureCatalogEvent("pagination-click", { nextPage });
+    }
+
     setPage(Math.max(1, Math.min(totalPages, nextPage)));
     loadProducts("pagination-click", nextPage, query);
   }
@@ -385,14 +442,20 @@ export default function CatalogShell({
           <button
             type="button"
             className={viewMode === "grid" ? "active" : ""}
-            onClick={() => setViewMode("grid")}
+            onClick={() => {
+              setViewMode("grid");
+              captureEvent("view-mode-change", { viewMode: "grid" });
+            }}
           >
             Grid
           </button>
           <button
             type="button"
             className={viewMode === "list" ? "active" : ""}
-            onClick={() => setViewMode("list")}
+            onClick={() => {
+              setViewMode("list");
+              captureEvent("view-mode-change", { viewMode: "list" });
+            }}
           >
             List
           </button>
@@ -528,9 +591,14 @@ function FilterPanel(props: any) {
           id="category-filter"
           value={props.selectedCategory || props.category}
           onChange={(event) => {
-            props.setCategory(event.target.value);
-            props.setSelectedCategory(event.target.value);
+            const nextCategory = event.target.value;
+            props.setCategory(nextCategory);
+            props.setSelectedCategory(nextCategory);
             props.loadProducts("category-select", 1);
+            captureEvent("filter-change", {
+              filterType: "category",
+              value: nextCategory,
+            });
           }}
         >
           <option value="">All categories</option>
@@ -552,7 +620,14 @@ function FilterPanel(props: any) {
               className={
                 props.brand === brand ? "brand-choice selected" : "brand-choice"
               }
-              onClick={() => props.setBrand(props.brand === brand ? "" : brand)}
+              onClick={() => {
+                const nextBrand = props.brand === brand ? "" : brand;
+                props.setBrand(nextBrand);
+                captureEvent("filter-change", {
+                  filterType: "brand",
+                  value: nextBrand,
+                });
+              }}
             >
               {brand}
             </button>
@@ -582,7 +657,14 @@ function FilterPanel(props: any) {
         />
         <button
           type="button"
-          onClick={() => props.loadProducts("price-filter", 1)}
+          onClick={() => {
+            props.loadProducts("price-filter", 1);
+            captureEvent("filter-change", {
+              filterType: "price",
+              minPrice: props.minPrice,
+              maxPrice: props.maxPrice,
+            });
+          }}
         >
           Apply price
         </button>
