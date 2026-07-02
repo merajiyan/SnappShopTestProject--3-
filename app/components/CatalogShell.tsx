@@ -62,12 +62,11 @@ export default function CatalogShell({
   const [lastRequestKey, setLastRequestKey] = useState("");
   const [shouldPreserveFiltersInUrl, setShouldPreserveFiltersInUrl] =
     useState(false);
-  const [copiedLink, setCopiedLink] = useState(false);
 
   const debouncedSearch = useDebounce((value: string) => {
     setQuery(value);
     setPage(1);
-  }, 3000);
+  }, 650);
 
   const priceBand = useMemo(
     () =>
@@ -277,24 +276,6 @@ export default function CatalogShell({
     analyticsEnabled,
   ]);
 
-  async function copyFilteredUrl() {
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    const nextHref = buildCatalogHref(true);
-    const nextUrl = `${window.location.origin}${nextHref}`;
-    setShouldPreserveFiltersInUrl(true);
-
-    try {
-      await window.navigator.clipboard.writeText(nextUrl);
-      setCopiedLink(true);
-      window.setTimeout(() => setCopiedLink(false), 1800);
-    } catch {
-      setCopiedLink(false);
-    }
-  }
-
   function onSearchChange(value: string) {
     setSearchText(value);
     setPage(1);
@@ -361,9 +342,6 @@ export default function CatalogShell({
             }}
           >
             Search
-          </button>
-          <button onClick={copyFilteredUrl}>
-            {copiedLink ? "Copied" : "Copy filtered URL"}
           </button>
         </div>
         <div className="toolbar-controls">
