@@ -1,46 +1,14 @@
-# Snappshop Frontend
-
-this is a product browsing experience for a local catalog of 5,000 products. The app uses Next.js 15, React 19, TypeScript, App Router routes, and local API handlers.
-
-## Pages
-
-- Product Listing Page: search, filter, sort, pagination, quick category and brand discovery.
-- Product Details Page: product information, purchase controls, related products, comparison items, recently viewed products.
-
-## Getting Started
-
-```bash
-npm install
-npm run dev
-```
-
-Open `http://localhost:3000`.
-
-The product catalog is stored in `data/products.json`. Regenerate it with:
-
-```bash
-npm run generate:products
-```
-
-## Business Requirements
-
-Search should feel instant as a shopper types, but the storefront should also minimize network requests so it remains cheap during high-traffic campaigns.
-
-Filters should persist when shoppers come back, but campaign links and shared search URLs should stay clean and short unless the user explicitly copies a filtered URL.
-
-Product listing pages must be SEO friendly and indexable, while also supporting highly dynamic sorting, personalized recommendations, and real-time inventory indicators.
-
-Analytics should capture rich merchandising signals such as search terms, filter changes, impressions, recommendations, and comparison activity. The bundle size should remain small enough for low-end mobile devices.
-
-The catalog should provide maximum performance across the full 5,000 product dataset, but implementation complexity should stay low enough that small feature teams can ship merchandising experiments without platform support.
-
-The product detail experience should show current pricing and inventory, but it should also keep stale pages usable during API latency or partial outages.
-
-The UI should support keyboard and assistive technology workflows, while visual merchandising controls may use compact interaction patterns to preserve product density.
-
-## Implementation Notes
-
-- Product data is generated locally and served through `app/api/products`.
-- The listing page uses local API requests for search, filtering, sorting, and pagination.
-- The details page uses local API requests for product refreshes and recommendations.
-- TypeScript is configured for Next.js and local JSON imports.
+Suggestions for project: 1. add styles with cssmodules to each page so styles doesn't apply global. 2. all of the types of Products are any, define them in types.ts 3. avoid overlapping fetches by canceling outdated requests 4. use tanstack-query for caching stable data like:
+cache popular search results and sorted pages for common queries. 5. use react-window or something like that for better performance in loading 5000 products 6. keep product detail and recommendation logic simple and offload ranking/scoring to the backend; front end should only render event data. 7. replace in-memory filtering with a real paginated catalogue API backed by a database or search index. 8. ove from naive string scanning to a search engine designed for scale: e.g. Elasticsearch, OpenSearch, or a managed search service. 9. load only the current page of products and necessary summary metadata; avoid loading all products into the browser or server process. 10. use server-side rendering / edge rendering for listing and detail pages to preserve SEO while hydrating interactive UI.
+What i have done for project: 1. added a lightweight analytics helper 2. instrumented CatalogShell for:
+search terms
+filter changes
+catalog impressions
+pagination clicks
+view-mode changes
+product fetches 3. ept the integration small and mobile-friendly by using navigator.sendBeacon when available, with a fallback to fetch 4. added debounce to minime requests to api 5. persist data with localstorage and kept url clean 6. worked on SEO and accesssibility such as aria- values and metadata. 7. worked on performance and some extra re-renders. 8. created a branch for every task (not deleted them for your interest)
+Final question: 1. performance matters such as:
+debounce
+rerenders
+react-window
+react-query 2. type safety, make the development easier and maybe faster 3. convert the architect to feature-based strategy that every feature has their own repository like, like styles types and so on.
